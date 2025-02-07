@@ -1,43 +1,117 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
-from reviews.models import Review
-from users.models import User
+from rest_framework.test import APITestCase
+
 from restaurants.models import Restaurant
+from reviews.models import Review
+
+from django.urls import reverse
+
 
 class ReviewModelTest(TestCase):
     def setUp(self):
-        # Review 모델 테스트에 필요한 설정
-        self.user = User.objects.create_user(
-            email='testuser@example.com',
-            nickname='testnickname',
-            password='testpassword'
+        self.user = get_user_model().objects.create_user(
+            nickname='testuser', email='test@example.com', password='password1234'
         )
         self.restaurant = Restaurant.objects.create(
             name='Test Restaurant',
-            address='123 Test Street',
-            contact='123-456-7890',
-            open_time='09:00:00',
-            close_time='21:00:00',
-            last_order='20:30:00',
-            regular_holiday='MON'
+            description='Test Description',
+            address='123 Test St',
+            contact='Phone: 010-0000-0000'
         )
-        self.review_data = {
+        self.data = {
             'user': self.user,
             'restaurant': self.restaurant,
-            'title': 'Great Food!',
-            'comment': 'The food was amazing, would visit again.'
+            'title': 'Test Review Title',
+            'comment': 'Tasty Yammy Yammy~'
         }
 
     def test_create_review(self):
-        # Review 모델의 create 메서드 테스트
-        review = Review.objects.create(
-            user=self.review_data['user'],
-            restaurant=self.review_data['restaurant'],
-            title=self.review_data['title'],
-            comment=self.review_data['comment']
-        )
+        review = Review.objects.create(**self.data)
 
-        # 리뷰가 제대로 생성되었는지 확인
-        self.assertEqual(review.user, self.review_data['user'])
-        self.assertEqual(review.restaurant, self.review_data['restaurant'])
-        self.assertEqual(review.title, self.review_data['title'])
-        self.assertEqual(review.comment, self.review_data['comment'])
+        self.assertEqual(review.title, self.data['title'])
+        self.assertEqual(review.comment, self.data['comment'])
+        self.assertEqual(review.user, self.data['user'])
+        self.assertEqual(review.restaurant, self.data['restaurant'])
+
+
+class ReviewAPIViewTestCase(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            nickname='testuser', email='test@example.com', password='password1234'
+        )
+        self.restaurant = Restaurant.objects.create(
+            name='Test Restaurant',
+            description='Test Description',
+            address='123 Test St',
+            contact='Phone: 010-0000-0000'
+        )
+        self.data = {
+            'user': self.user,
+            'restaurant': self.restaurant,
+            'title': 'Test Review Title',
+            'comment': 'Tasty Yammy Yammy~'
+        }
+
+        self.client.login(email='test@example.com', password='password1234')
+
+    def test_get_review_list(self):
+        self.review = Review.objects.create(**self.data)
+        url = reverse('review-list', kwargs={'restaurant_id': self.restaurant.id})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data.get('results')), 1)
+        self.assertEqual(response.data.get('results')[0].get('title'), self.review.title)
+        self.assertEqual(response.data.get('results')[0].get('comment'), self.review.comment)
+        self.assertEqual(response.data.get('results')[0].get('user')['id'], self.review.user.id)
+        self.assertEqual(response.data.get('results')[0].get('restaurant'), self.review.restaurant.id)
+
+    def test_post_review(self):
+        url = reverse('review-list', kwargs={'restaurant_id': self.restaurant.id})
+
+        response = self.client.post(url, self.data)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data.get('title'),  self.data['title'])
+        self.assertEqual(response.data.get('comment'), self.data['comment'])
+        self.assertEqual(response.data.get('user')['id'], self.data['user'].id)
+        self.assertEqual(response.data.get('restaurant'), self.data['restaurant'].id)
+
+    def test_get_review_detail(self):
+        self.review = Review.objects.create(**self.data)
+        url = reverse('review-detail', kwargs={'review_id': self.review.id})
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.get('title'), self.review.title)
+        self.assertEqual(response.data.get('comment'), self.review.comment)
+        self.assertEqual(response.data.get('user')['id'], self.review.user.id)
+        self.assertEqual(response.data.get('restaurant')['id'], self.review.restaurant.id)
+
+    def test_update_review(self):
+        self.review = Review.objects.create(**self.data)
+        url = reverse('review-detail', kwargs={'review_id': self.review.id})
+        updated_data = {
+            'title': 'Updated Review Title',
+            'comment': 'Updated Tasty Yammy Yammy~'
+        }
+
+        response = self.client.put(url, updated_data)
+
+        self.assertEqual(response.status_code, 200)
+        self.review.refresh_from_db()
+        self.assertEqual(self.review.title, updated_data['title'])
+        self.assertEqual(self.review.comment, updated_data['comment'])
+
+    def test_delete_review(self):
+        self.review = Review.objects.create(**self.data)
+        url = reverse('review-detail', kwargs={'review_id': self.review.id})
+
+        response = self.client.delete(url)
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Review.objects.filter(id=self.review.id).exists())
+        self.assertEqual(Review.objects.count(), 0)
