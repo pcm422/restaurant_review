@@ -49,6 +49,7 @@ INSTALLED_APPS = [
 
     # 3rd party
     'rest_framework',
+    'django_cleanup',
 ]
 
 MIDDLEWARE = [
@@ -109,6 +110,9 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
+# Authentication
+AUTH_USER_MODEL = 'users.User'
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -159,8 +163,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
-}
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',  # 페이지네이션 설정
+    'PAGE_SIZE': 10,  # 한 페이지에 보여줄 항목 수
 
-AUTH_USER_MODEL = 'users.User'
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',  # 세션 인증 방식
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',  # 인증된 사용자만 쓰기 가능
+    ],
+}
