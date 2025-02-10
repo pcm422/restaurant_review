@@ -5,5 +5,5 @@ from restaurants.serializers import RestaurantSerializer
 
 
 class RestaurantViewSet(ModelViewSet):
-    queryset = Restaurant.objects.all()
+    queryset = Restaurant.objects.all().order_by('name')
     serializer_class = RestaurantSerializer
